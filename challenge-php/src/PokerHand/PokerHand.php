@@ -15,6 +15,8 @@ class PokerHand
 
     private function getRankFromCard($card)
     {
+        // 10 is the only rank that uses 2 characters, making the card string 3 chars total
+        // All other ranks are single characters (A, K, Q, J, 9, 8, etc.)
         if (strlen($card) == 3) {
             return '10';
         }
@@ -72,10 +74,11 @@ class PokerHand
             $ranks[] = $this->getRankFromCard($card);
         }
         
+        // Convert ranks to numeric values so we can check if they're consecutive
         $values = array_map([$this, 'getRankValue'], $ranks);
         sort($values);
         
-        // Check for normal straight
+        // Check if values are consecutive (each one is exactly 1 more than the previous)
         $isNormalStraight = true;
         for ($i = 1; $i < count($values); $i++) {
             if ($values[$i] !== $values[$i - 1] + 1) {
@@ -84,7 +87,8 @@ class PokerHand
             }
         }
         
-        // Check for A-2-3-4-5 straight (wheel)
+        // Special case: A-2-3-4-5 is a valid straight (wheel)
+        // Ace counts as low here, so it's 2-3-4-5-14 after conversion
         $wheel = [2, 3, 4, 5, 14];
         sort($wheel);
         $isWheel = $values === $wheel;
@@ -128,8 +132,31 @@ class PokerHand
         return in_array(3, $rankCounts) && in_array(2, $rankCounts);
     }
 
+    private function isThreeOfAKind()
+    {
+        // Three of a kind means one rank appears 3 times
+        // But we need to exclude Full House, which also has three of a kind plus a pair
+        $rankCounts = $this->getRankCounts();
+        return in_array(3, $rankCounts) && !in_array(2, $rankCounts);
+    }
+
+    private function isTwoPair()
+    {
+        // Count how many ranks appear exactly twice
+        // Two pair means exactly two different ranks each appear twice
+        $rankCounts = $this->getRankCounts();
+        $pairCount = 0;
+        
+        foreach ($rankCounts as $count) {
+            if ($count === 2) {
+                $pairCount++;
+            }
+        }
+        
+        return $pairCount === 2;
+    }
+
     private function isOnePair()
-    //This function will return true if the hand is a one pair
     {
         $rankCounts = $this->getRankCounts();
         $pairCount = 0;
@@ -145,10 +172,15 @@ class PokerHand
 
     public function getRank()
     {
+        // Check highest to lowest - order matters because some hands match multiple patterns
+        // Royal Flush is also a Straight Flush, but we want to return the higher rank
+        
         if ($this->isRoyalFlush()) {
             return 'Royal Flush';
         }
         
+        // Must check Straight Flush before Flush and Straight separately
+        // A straight flush matches both patterns but ranks higher
         if ($this->isStraightFlush()) {
             return 'Straight Flush';
         }
@@ -157,20 +189,42 @@ class PokerHand
             return 'Four of a Kind';
         }
         
+        // Full House has both three of a kind and a pair, but ranks higher than either alone
         if ($this->isFullHouse()) {
             return 'Full House';
         }
         
+        // Flush: all same suit but not a straight
+        // We already checked for straight flush above, so this is just a flush
+        if ($this->isFlush()) {
+            return 'Flush';
+        }
+        
+        // Straight: consecutive ranks but not all same suit
+        // We already checked for straight flush above, so this is just a straight
+        if ($this->isStraight()) {
+            return 'Straight';
+        }
+        
+        // Three of a kind: one rank appears 3 times, others are different
+        // Must check after Full House since Full House also has three of a kind
+        if ($this->isThreeOfAKind()) {
+            return 'Three of a Kind';
+        }
+        
+        // Two pair: two different ranks each appear twice
+        // Must check before one pair since two pair ranks higher
+        if ($this->isTwoPair()) {
+            return 'Two Pair';
+        }
+        
+        // One pair: exactly one rank appears twice
         if ($this->isOnePair()) {
             return 'One Pair';
         }
         
+        // If none of the above match, it's just the highest card
         return 'High Card';
     }
 
-    // TEMPORARY: Just for testing - remove this later!
-    public function getCards()
-    {
-        return $this->cards;
-    }
 }
